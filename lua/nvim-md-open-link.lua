@@ -13,7 +13,37 @@ local is_valid_link = function(url)
 	end
 end
 
+local qute_browser_exist = function()
+	local os = vim.loop.os_uname().sysname
+	local check_cmd = "command -v qutebrowser"
+	if os == "Windows" then
+		check_cmd = "(Get-Command qutebrowser).Source"
+	end
+
+	-- checks if command qutebrowser exists
+	local handle = io.popen(check_cmd)
+	if handle == nil then
+		return false
+	end
+	local result = handle:read("*a")
+	handle:close()
+
+	return result ~= ""
+end
+
 local open_link = function(url)
+	local has_qute_browser = qute_browser_exist()
+	if has_qute_browser then
+		vim.fn.jobstart({ "qutebrowser", url }, {
+			on_exit = function(_, code)
+				if code ~= 0 then
+					vim.print("Failed to open link in qutebrowser")
+				end
+			end,
+		})
+		return
+	end
+
 	local os = vim.loop.os_uname().sysname
 	if os == "Darwin" then
 		vim.fn.jobstart({ "open", url })
