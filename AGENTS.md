@@ -2,8 +2,9 @@
 
 ## Repository overview
 
-Single-file Neovim plugin (~96 lines). Entire implementation lives in
-`lua/nvim-md-open-link.lua`. No build system, no tests, no CI, no lockfiles.
+Single-file Neovim plugin runtime implementation. Core code lives in
+`lua/nvim-md-open-link.lua`, with tests in `spec/nvim-md-open-link_spec.lua`
+and task automation in `Taskfile.yaml`. No build system, no CI, no lockfiles.
 
 ## Runtime dependency
 
@@ -26,11 +27,27 @@ dependency — the `require` call is at module load time, not lazy-loaded.
 opts = { keymap = "gb" }  -- default
 ```
 
-## No tooling to run
+## Test tooling
 
-There are no lint, test, format, or build commands — none exist. Manual
-testing requires loading the plugin inside Neovim with `nvim-treesitter`
-installed and a markdown file open.
+- `task setup` installs `nlua` and `busted` via LuaRocks (Lua 5.1).
+- `task test` runs the full test suite with the LuaRocks environment loaded.
+- `task test:verbose` runs the suite with verbose output.
+- `task test:file FILE=spec/xxx_spec.lua` runs one spec file.
+
+The task commands load LuaRocks paths before running `busted`, so they work
+even when `busted` is not on the default shell `PATH`.
+
+## Manual runtime check
+
+Manual runtime testing requires loading the plugin inside Neovim with
+`nvim-treesitter` installed and a markdown file open.
+
+## Testing caveat (nlua)
+
+In specs, do not fully replace `_G.vim` with a plain table when running under
+`nlua`; preserve the original `vim` table (for example via metatable fallback)
+and override only needed fields. Replacing `_G.vim` can break internal
+`vim._init_packages` expectations (for example missing `vim.api`).
 
 ## Adding features — things to watch
 

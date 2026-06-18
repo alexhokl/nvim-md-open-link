@@ -13,3 +13,14 @@ Neovim plugin to open links in markdown files
     },
 },
 ```
+
+## Tests
+
+This project uses `busted` for unit tests.
+
+Install test dependencies and run:
+
+```bash
+task setup
+task test
+```
