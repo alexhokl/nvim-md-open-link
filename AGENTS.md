@@ -2,23 +2,41 @@
 
 ## Repository overview
 
-Single-file Neovim plugin (~96 lines). Entire implementation lives in
-`lua/nvim-md-open-link.lua`. No build system, no tests, no CI, no lockfiles.
+Two-file Neovim plugin. Implementation is split across:
+
+- `lua/nvim-md-open-link/link.lua` — pure logic (testable, no side effects)
+- `lua/nvim-md-open-link/init.lua` — side-effectful entry point (keymap, browser
+  dispatch)
 
 ## Runtime dependency
 
-Requires `nvim-treesitter` (`nvim-treesitter.ts_utils`). This is a hard
-dependency — the `require` call is at module load time, not lazy-loaded.
+Requires `nvim-treesitter` for its markdown/markdown_inline parsers. The
+`nvim-treesitter.ts_utils` module is **not** used; the plugin queries the
+`markdown_inline` injected child parser directly via
+`vim.treesitter.get_parser()`.
 
 ## How the plugin works
 
 - Entry point: `M.setup(options)` registers a normal-mode keymap (default `gb`).
-- On keypress, `try_open_link()` uses treesitter to find an `inline_link` node
-  at cursor, extracts the URL from `named_child(1)`, validates `http://` or
-  `https://` prefix, then calls `open_link(url)`.
+- On keypress, `try_open_link()` calls `link.get_inline_node_at(row, col)` to
+  get the deepest node from the `markdown_inline` injected treesitter tree, then
+  passes it to `link.get_url_from_node(node)` to extract the URL.
+- `get_url_from_node` walks up at most one level from the cursor node to find an
+  `inline_link` node, then returns the text of its second named child
+  (`link_destination`).
+- The URL is validated with `link.is_valid_link(url)` (`http://` or `https://`
+  only), then passed to `open_link(url)`.
 - Browser priority: `qutebrowser` (if on `$PATH`) → `open` (macOS) →
   `xdg-open` (Linux) → `cmd /c start` (Windows). All launched via
   `vim.fn.jobstart()`.
+
+## Why markdown_inline, not markdown
+
+Treesitter parses markdown in two passes. The block-level `markdown` parser
+only sees `inline` nodes; `inline_link` lives in the injected `markdown_inline`
+grammar. `ts_utils.get_node_at_cursor()` returns block-level nodes and therefore
+never finds `inline_link` — the plugin queries the injected child parser
+directly.
 
 ## Only configurable option
 
@@ -26,18 +44,40 @@ dependency — the `require` call is at module load time, not lazy-loaded.
 opts = { keymap = "gb" }  -- default
 ```
 
-## No tooling to run
+## Running tests
 
-There are no lint, test, format, or build commands — none exist. Manual
-testing requires loading the plugin inside Neovim with `nvim-treesitter`
-installed and a markdown file open.
+One-time setup (requires luarocks):
+
+```sh
+task setup
+```
+
+Run all tests:
+
+```sh
+task test
+```
+
+Run a single spec file:
+
+```sh
+task test-file -- spec/link_spec.lua
+```
+
+Tests use [busted](https://lunarmodules.github.io/busted/) with
+[nlua](https://github.com/mfussenegger/nlua) as the Lua interpreter. All
+dependencies must be installed for **Lua 5.1 (LuaJIT)**; using a different Lua
+version causes nlua to fail loading compiled `.so` files.
 
 ## Adding features — things to watch
 
-- The treesitter node type `"inline_link"` is specific to the markdown grammar.
-  If extending to other link types (e.g. `link_destination`, `image`), verify
-  node type names against the actual grammar.
-- `is_valid_link` only accepts `http://` and `https://` — file:// and other
+- `inline_link` and `link_destination` are node types from the
+  `markdown_inline` grammar. If extending to other link types (e.g. `image`,
+  `autolink`), verify node type names against that grammar.
+- `get_inline_node_at` iterates all trees from the `markdown_inline` child
+  parser and picks the one whose range contains the cursor. If the cursor is
+  not inside any inline content (e.g. blank line), it returns `nil`.
+- `is_valid_link` only accepts `http://` and `https://` — `file://` and other
   schemes are silently rejected.
 - `qute_browser_exist()` uses `command -v` (POSIX) or PowerShell on Windows;
   test both code paths if touching that function.

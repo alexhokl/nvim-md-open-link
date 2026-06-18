@@ -1,0 +1,30 @@
+version: '3'
+
+vars:
+  NLUA: /Users/alex/.luarocks/bin/nlua
+
+tasks:
+  setup:
+    desc: "Install nlua and busted via luarocks (Lua 5.1 for nlua/Neovim compatibility)"
+    cmds:
+      - luarocks --local --lua-version 5.1 install nlua
+      - luarocks --local --lua-version 5.1 install busted
+
+  test:
+    desc: "Run all tests"
+    cmds:
+      - |
+        eval "$(luarocks --lua-version 5.1 path)" && \
+        busted --lua {{.NLUA}} spec/
+
+  test-file:
+    desc: "Run a single spec file: task test-file -- spec/link_spec.lua"
+    cmds:
+      - |
+        eval "$(luarocks --lua-version 5.1 path)" && \
+        busted --lua {{.NLUA}} {{.CLI_ARGS}}
+
+  clean:
+    desc: "Remove the local luarocks tree"
+    cmds:
+      - rm -rf lua_modules luarocks.lock
